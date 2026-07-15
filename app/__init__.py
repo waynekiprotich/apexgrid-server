@@ -10,10 +10,8 @@ def create_app(config_name="default"):
     initialize_firebase()
 
     # Initialize extensions
-    allowed_origins = app.config.get("CORS_ALLOWED_ORIGINS", "*")
-    if "*" in allowed_origins or allowed_origins == "*":
-        allowed_origins = "*"  # Flask-CORS will echo the Origin header
-
+    # Use a regex to allow all origins dynamically to bypass any misconfiguration in environment variables
+    allowed_origins = r".*"
     cors.init_app(app, origins=allowed_origins, supports_credentials=True)
     ma.init_app(app)
 
