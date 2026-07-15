@@ -9,18 +9,40 @@ logger = logging.getLogger(__name__)
 def initialize_firebase():
     if not firebase_admin._apps:
         try:
-            # 1. Try to load from environment variable JSON string (Render/Production)
+            # 1. Try to load from environment variable (Render/Production)
             cred_json_str = os.environ.get("FIREBASE_CREDENTIALS")
-            if cred_json_str:
+            if cred_json_str and cred_json_str.strip():
+                cred_json_str = cred_json_str.strip()
+                
+                # Check if the environment variable is actually a path to a file (e.g. Render Secret File)
+                if os.path.exists(cred_json_str) and os.path.isfile(cred_json_str):
+                    cred = credentials.Certificate(cred_json_str)
+                    firebase_admin.initialize_app(cred)
+                    logger.info("Firebase initialized successfully using FIREBASE_CREDENTIALS (as a file path).")
+                    return
+                
+                # Try parsing as JSON string
                 try:
                     cred_dict = json.loads(cred_json_str)
                     cred = credentials.Certificate(cred_dict)
                     firebase_admin.initialize_app(cred)
-                    logger.info("Firebase initialized successfully using FIREBASE_CREDENTIALS environment variable.")
+                    logger.info("Firebase initialized successfully using FIREBASE_CREDENTIALS (as JSON string).")
                     return
                 except json.JSONDecodeError:
-                    logger.error("FIREBASE_CREDENTIALS environment variable contains invalid JSON.")
-                    raise
+                    # Could it be base64 encoded?
+                    import base64
+                    try:
+                        decoded = base64.b64decode(cred_json_str).decode('utf-8')
+                        cred_dict = json.loads(decoded)
+                        cred = credentials.Certificate(cred_dict)
+                        firebase_admin.initialize_app(cred)
+                        logger.info("Firebase initialized successfully using FIREBASE_CREDENTIALS (as base64 string).")
+                        return
+                    except Exception:
+                        pass
+                        
+                    logger.error("FIREBASE_CREDENTIALS is not a valid file path, JSON string, or Base64 string.")
+                    raise ValueError("Invalid FIREBASE_CREDENTIALS format.")
                 except Exception as e:
                     logger.error(f"Failed to initialize Firebase with FIREBASE_CREDENTIALS: {e}")
                     raise
@@ -39,6 +61,7 @@ def initialize_firebase():
             
         except Exception as e:
             logger.error("Failed to initialize Firebase Admin SDK. Backend cannot start correctly.")
+            # We raise so that Gunicorn fails fast instead of silently running a broken app
             raise
 
 class BaseConfig:
