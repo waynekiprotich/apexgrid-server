@@ -52,4 +52,13 @@ def create_app(config_name="default"):
     from .middleware.error_handlers import register_error_handlers
     register_error_handlers(app)
 
+    @app.route("/", methods=["GET"])
+    def index():
+        from flask import jsonify
+        return jsonify({
+            "name": "ApexGrid API",
+            "status": "running",
+            "version": "v1"
+        })
+
     return app
