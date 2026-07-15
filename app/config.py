@@ -66,7 +66,7 @@ def initialize_firebase():
 
 class BaseConfig:
     OPENF1_BASE_URL = os.environ.get("OPENF1_BASE_URL", "https://api.openf1.org")
-    CORS_ALLOWED_ORIGINS = os.environ.get("CORS_ALLOWED_ORIGINS", "*").split(",")
+    CORS_ALLOWED_ORIGINS = [origin.strip() for origin in os.environ.get("CORS_ALLOWED_ORIGINS", "*").split(",")]
     REDIS_URL = os.environ.get("REDIS_URL")
     
 class DevConfig(BaseConfig):
