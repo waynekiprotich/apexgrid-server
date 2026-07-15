@@ -2,13 +2,15 @@ import json
 from datetime import datetime, timezone, timedelta
 from flask import current_app
 import redis
-from ..models.cache import CachedRaceData
-from ..extensions import db
+from ..extensions import get_db
 
 def get_redis_client():
     redis_url = current_app.config.get("REDIS_URL")
     if redis_url:
-        return redis.from_url(redis_url)
+        try:
+            return redis.from_url(redis_url)
+        except Exception:
+            return None
     return None
 
 def get(resource, **kwargs):
@@ -24,19 +26,25 @@ def get(resource, **kwargs):
         except Exception:
             pass 
             
-    session_key = kwargs.get("session_key", 0)
+    # Fallback to Firestore
+    db = get_db()
+    # document ID can't contain '/' or other bad characters, so let's sanitize
+    safe_doc_id = cache_key.replace('/', '_').replace('?', '_').replace('&', '_').replace('=', '_')
+    if not safe_doc_id:
+        return None
+        
+    doc_ref = db.collection("cache").document(safe_doc_id)
+    doc = doc_ref.get()
     
-    cached_record = CachedRaceData.query.filter_by(session_key=session_key, resource=cache_key).first()
-    if cached_record:
-        # SQLite might return naive datetimes
-        if cached_record.expires_at.tzinfo is None:
-            cached_record.expires_at = cached_record.expires_at.replace(tzinfo=timezone.utc)
-        if cached_record.expires_at > datetime.now(timezone.utc):
-            return cached_record.data
-        else:
-            db.session.delete(cached_record)
-            db.session.commit()
-    
+    if doc.exists:
+        data = doc.to_dict()
+        expires_at_str = data.get("expires_at")
+        if expires_at_str:
+            expires_at = datetime.fromisoformat(expires_at_str)
+            if expires_at > datetime.now(timezone.utc):
+                return data.get("data")
+            else:
+                doc_ref.delete()
     return None
 
 def set(resource, data, ttl_seconds, **kwargs):
@@ -50,21 +58,17 @@ def set(resource, data, ttl_seconds, **kwargs):
         except Exception:
             pass
             
-    session_key = kwargs.get("session_key", 0)
+    # Fallback to Firestore
+    db = get_db()
+    safe_doc_id = cache_key.replace('/', '_').replace('?', '_').replace('&', '_').replace('=', '_')
+    if not safe_doc_id:
+        return
+        
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds)
+    doc_ref = db.collection("cache").document(safe_doc_id)
     
-    cached_record = CachedRaceData.query.filter_by(session_key=session_key, resource=cache_key).first()
-    if cached_record:
-        cached_record.data = data
-        cached_record.expires_at = expires_at
-        cached_record.fetched_at = datetime.now(timezone.utc)
-    else:
-        cached_record = CachedRaceData(
-            session_key=session_key,
-            resource=cache_key,
-            data=data,
-            expires_at=expires_at
-        )
-        db.session.add(cached_record)
-    
-    db.session.commit()
+    doc_ref.set({
+        "data": data,
+        "expires_at": expires_at.isoformat(),
+        "fetched_at": datetime.now(timezone.utc).isoformat()
+    })

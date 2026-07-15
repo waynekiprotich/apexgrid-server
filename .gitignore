@@ -1,0 +1,66 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+build/
+dist/
+develop-eggs/
+.eggs/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+.env_dir/
+
+# Environments
+.env
+.env.*
+
+# IDEs / Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Testing and Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+
+# Firebase / Secrets
+firebase/serviceAccountKey.json
+serviceAccountKey.json
+google-services.json
+GoogleService-Info.plist
+*.pem
+*.key
+credentials/
+secrets/
+*.json
+!package.json
+!package-lock.json
+
+# Uploads / Temp files
+uploads/
+tmp/
+temp/
+logs/
+*.log

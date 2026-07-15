@@ -1,9 +1,8 @@
 import os
-from flask import Blueprint, request, jsonify, current_app, send_from_directory
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask import Blueprint, request, jsonify, current_app, send_from_directory, g
 from werkzeug.utils import secure_filename
-from ..extensions import db
-from ..models.user import User
+from ..extensions import get_db
+from ..services.auth_service import require_auth
 import uuid
 
 uploads_bp = Blueprint("uploads", __name__)
@@ -14,11 +13,14 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 @uploads_bp.route("/avatars", methods=["POST"])
-@jwt_required()
+@require_auth
 def upload_avatar():
-    user_id = get_jwt_identity()
-    user = User.query.get(user_id)
-    if not user:
+    user_id = g.user_id
+    db = get_db()
+    user_ref = db.collection("users").document(user_id)
+    doc = user_ref.get()
+    
+    if not doc.exists:
         return jsonify({"error": {"code": "NOT_FOUND", "message": "User not found", "status": 404}}), 404
 
     if 'file' not in request.files:
@@ -46,8 +48,9 @@ def upload_avatar():
         file.save(file_path)
         
         # Delete old avatar if it exists
-        if user.avatar_url:
-            old_filename = user.avatar_url.split('/')[-1]
+        user_data = doc.to_dict()
+        if user_data.get("avatar_url"):
+            old_filename = user_data["avatar_url"].split('/')[-1]
             old_path = os.path.join(upload_folder, old_filename)
             if os.path.exists(old_path):
                 try:
@@ -56,8 +59,7 @@ def upload_avatar():
                     pass
         
         url = f"/api/v1/uploads/avatars/{filename}"
-        user.avatar_url = url
-        db.session.commit()
+        user_ref.update({"avatar_url": url})
         
         return jsonify({"data": {"avatar_url": url}, "meta": {}})
         

@@ -1,15 +1,15 @@
 from flask import Flask
-from .config import config
-from .extensions import db, migrate, jwt, cors, ma
+from .config import config, initialize_firebase
+from .extensions import cors, ma
 
 def create_app(config_name="default"):
     app = Flask(__name__)
     app.config.from_object(config[config_name])
 
+    # Initialize Firebase
+    initialize_firebase()
+
     # Initialize extensions
-    db.init_app(app)
-    migrate.init_app(app, db)
-    jwt.init_app(app)
     cors.init_app(app, origins=app.config.get("CORS_ALLOWED_ORIGINS", "*"), supports_credentials=True)
     ma.init_app(app)
 
